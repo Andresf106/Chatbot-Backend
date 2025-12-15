@@ -1,9 +1,8 @@
-
-
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models.doctor_model import Doctor
+from schemas.doctor_schema import DoctorCreate, DoctorResponse
 
 router = APIRouter(prefix="/doctores", tags=["Doctores"])
 
@@ -14,34 +13,28 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/")
-def listar_doctores(db: Session = Depends(get_db)):
-    doctores = db.query(Doctor).all()
-    return [d.to_dict() for d in doctores]
+@router.post("/", response_model=DoctorResponse)
+def crear_doctor(data: DoctorCreate, db: Session = Depends(get_db)):
+    doctor = Doctor(**data.model_dump())
+    db.add(doctor)
+    db.commit()
+    db.refresh(doctor)
+    return doctor
 
-@router.get("/{id_doctor}")
+@router.get("/", response_model=list[DoctorResponse])
+def listar_doctores(db: Session = Depends(get_db)):
+    return db.query(Doctor).all()
+
+@router.get("/{id_doctor}", response_model=DoctorResponse)
 def obtener_doctor(id_doctor: int, db: Session = Depends(get_db)):
-    doctor = db.query(Doctor).get(id_doctor)
+    doctor = db.get(Doctor, id_doctor)
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor no encontrado")
-    return doctor.to_dict()
-
-@router.post("/")
-def crear_doctor(data: dict, db: Session = Depends(get_db)):
-    nuevo = Doctor(
-        nombre=data["nombre"],
-        especialidad=data["especialidad"],
-        telefono=data.get("telefono"),
-        correo=data.get("correo")
-    )
-    db.add(nuevo)
-    db.commit()
-    db.refresh(nuevo)
-    return nuevo.to_dict()
+    return doctor
 
 @router.delete("/{id_doctor}")
 def eliminar_doctor(id_doctor: int, db: Session = Depends(get_db)):
-    doctor = db.query(Doctor).get(id_doctor)
+    doctor = db.get(Doctor, id_doctor)
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor no encontrado")
     db.delete(doctor)

@@ -1,16 +1,18 @@
-from pydantic import BaseModel
+# schemas/usuario_schema.py
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class UsuarioCreateSchema(BaseModel):
     nombre: str
-    segundo_nombre: str | None = None
-    celular: str | None = None
-    correo: str
-    rol: str | None = None
-    direccion: str | None = None
-    ciudad: str | None = None
-    contrasenia: str
-
+    segundo_nombre: Optional[str] = None
+    celular: Optional[str] = None
+    gmail: Optional[str] = None  # <- agregar esto
+    contrasena: str
+    rol: Optional[str] = None
+    direccion: Optional[str] = None
+    ciudad: Optional[str] = None
+    correo: EmailStr
 
 class LoginSchema(BaseModel):
-    correo: str
-    contrasenia: str
+    correo: EmailStr
+    contrasena: str

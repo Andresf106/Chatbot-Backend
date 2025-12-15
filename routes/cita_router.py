@@ -1,10 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-
 from database import SessionLocal
 from models.cita_model import Cita
-from models.horario_doctor_model import HorarioDoctor
-from models.horario_model import Horario
+from schemas.cita_schema import CitaCreate, CitaResponse
 
 router = APIRouter(prefix="/citas", tags=["Citas"])
 
@@ -15,71 +13,65 @@ def get_db():
     finally:
         db.close()
 
-# Crear cita validando horario
-@router.post("/")
-def crear_cita(id_usuario: int, id_doctor: int, dia: str, hora: str, motivo: str, db: Session = Depends(get_db)):
 
-    # 1️⃣ Obtener horarios asignados al doctor
-    horarios_doctor = (
-        db.query(HorarioDoctor)
-        .filter(HorarioDoctor.id_doctor == id_doctor)
-        .all()
-    )
+# ------------------------
+# LISTAR TODAS LAS CITAS
+# ------------------------
+@router.get("/", response_model=list[CitaResponse])
+def listar_citas(db: Session = Depends(get_db)):
+    return db.query(Cita).all()
 
-    if not horarios_doctor:
-        raise HTTPException(status_code=400, detail="El doctor no tiene horarios asignados")
 
-    # 2️⃣ Verificar si la hora/día está dentro de un horario
-    permitido = False
-    for h in horarios_doctor:
-        horario = h.horario
+# ------------------------
+# OBTENER CITA POR ID
+# ------------------------
+@router.get("/{id_cita}", response_model=CitaResponse)
+def obtener_cita(id_cita: int, db: Session = Depends(get_db)):
+    cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    return cita
 
-        if horario.dia == dia:
-            if horario.hora_inicio <= hora <= horario.hora_fin:
-                permitido = True
-                break
 
-    if not permitido:
-        raise HTTPException(
-            status_code=400,
-            detail="El horario solicitado no está dentro del horario del doctor"
-        )
-
-    # 3️⃣ Verificar que la hora no esté ocupada ya
-    cita_existente = (
-        db.query(Cita)
-        .filter(
-            Cita.id_doctor == id_doctor,
-            Cita.dia_cita == dia,
-            Cita.hora_cita == hora
-        )
-        .first()
-    )
-
-    if cita_existente:
-        raise HTTPException(
-            status_code=400,
-            detail="Ya existe una cita en ese horario"
-        )
-
-    # 4️⃣ Crear cita
-    nueva_cita = Cita(
-        id_usuario=id_usuario,
-        id_doctor=id_doctor,
-        dia_cita=dia,
-        hora_cita=hora,
-        motivo=motivo
-    )
-
+# ------------------------
+# CREAR CITA
+# ------------------------
+@router.post("/", response_model=CitaResponse)
+def crear_cita(data: CitaCreate, db: Session = Depends(get_db)):
+    nueva_cita = Cita(**data.model_dump())
     db.add(nueva_cita)
     db.commit()
     db.refresh(nueva_cita)
+    return nueva_cita
 
-    return {
-        "message": "Cita agendada correctamente",
-        "data": {
-            "id_cita": nueva_cita.id_cita,
-            "dia": dia,
-            "hora": hora
-        }
-    }
+
+# ------------------------
+# ACTUALIZAR CITA
+# ------------------------
+@router.put("/{id_cita}", response_model=CitaResponse)
+def actualizar_cita(id_cita: int, data: CitaCreate, db: Session = Depends(get_db)):
+    cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    for key, value in data.model_dump().items():
+        if hasattr(cita, key):
+            setattr(cita, key, value)
+
+    db.commit()
+    db.refresh(cita)
+    return cita
+
+
+# ------------------------
+# ELIMINAR CITA
+# ------------------------
+@router.delete("/{id_cita}")
+def eliminar_cita(id_cita: int, db: Session = Depends(get_db)):
+    cita = db.query(Cita).filter(Cita.id_cita == id_cita).first()
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    db.delete(cita)
+    db.commit()
+    return {"message": "Cita eliminada correctamente"}

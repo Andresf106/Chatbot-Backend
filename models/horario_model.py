@@ -10,5 +10,4 @@ class Horario(Base):
     hora_inicio = Column(String(10), nullable=False)
     hora_fin = Column(String(10), nullable=False)
 
-    # Relación inversa con la tabla intermedia
-    doctores = relationship("HorarioDoctor", back_populates="horario")
+    doctores = relationship("HorarioDoctor", back_populates="horario", cascade="all, delete")
